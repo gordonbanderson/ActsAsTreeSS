@@ -1,5 +1,5 @@
 {
-	"name": "weboftalent/actsastree",
+	"name": "weboftalent/acts_as_tree",
 	"description": "Fast efficient retrieval of hierichal SiteTree sections in SilverStripe",
 	"keywords": ["silverstripe", "tree", "acts as tree", "efficient", "hierarchy"],
 	"authors": [
