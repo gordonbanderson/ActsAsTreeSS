@@ -1,9 +1,6 @@
 {
 	"name": "weboftalent/actsastree",
-	"description": "Modelled on the rails module acts_as_tree, this will keep
-	lineage and depth for each Page, allowing fast retrieval of sections of the
-	site in one query.  This avoids the need for hierarchical traversal.",
-	"type": "silverstripe-module",
+	"description": "Fast efficient retrieval of hierichal SiteTree sections in SilverStripe",
 	"keywords": ["silverstripe", "tree", "acts as tree", "efficient", "hierarchy"],
 	"authors": [
 		{
@@ -15,7 +12,7 @@
 	],
 	"require": {
 		"silverstripe/cms": "~3.1"
-	}
+	},
     "support": {
         "issues": "https://github.com/gordonbanderson/ActsAsTreeSS/issues"
     },
