@@ -1,0 +1,7 @@
+---
+Name: acts_as_tree
+After: 'framework/*','cms/*'
+---
+SiteTree:
+  extensions:
+    - ActsAsTreeExtension
