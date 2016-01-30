@@ -23,13 +23,14 @@
 
 ##Introduction
 
+**** WORK IN PROGRESS ****
+
+Adds a depth and lineage field to SiteTree and maintains these after any write operations.
  
 ##Documentation
 
 
 ##Requirements
-* SilverStripe 3.1
+* SilverStripe 3.1 or above
 
 ##TODO
-* Tests
-* Add other mapping services such as Leaflet
