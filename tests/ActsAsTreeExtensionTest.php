@@ -10,6 +10,13 @@ class ActsAsTreeExtensionTest extends SapphireTest {
         $page->requireDefaultRecords();
     }
 
+    public function testRequireDefaultRecords() {
+        error_log('Testing RDFR');
+        foreach (Page::get() as $page) {
+            echo $Page->Title . ' ' . $Page->Depth;
+        }
+    }
+
 	public function testOnBeforeWrite() {
 		$this->markTestSkipped('TODO');
 	}
