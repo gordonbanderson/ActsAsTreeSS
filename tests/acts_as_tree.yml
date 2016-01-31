@@ -9,3 +9,18 @@ Page:
     Title: Top Level 3
   toplevel04:
     Title: Top Level 4
+  menu0401:
+    Title: Menu 4/1
+    Parent: =>Page.toplevel04
+  menu0402:
+    Title: Menu 4/2
+    Parent: =>Page.toplevel04
+  menu0403:
+    Title: Menu 4/3
+    Parent: =>Page.toplevel04
+  menu0404:
+    Title: Menu 4/4
+    Parent: =>Page.toplevel04
+  menu040401:
+    Title: Menu 4/4/1
+    Parent: =>Page.menu0404
