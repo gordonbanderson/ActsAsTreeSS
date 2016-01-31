@@ -45,28 +45,27 @@ class ActsAsTreeExtension extends DataExtension {
 		//error_log('++++ ON AFTER WRITE, LINEAGE FIXED=:'.$this->owner->LineageFixed.', ctr='.$this->oawctr);
 
 		if (!($this->owner->LineageFixed) || ($this->oawctr == 3)) {
-			//error_log('++++ FIXING LINEAGE T1 ++++');
-			// Calculate depth and lineage from parent comment
+			error_log('++++ FIXING LINEAGE T1 ++++');
 			if ($this->owner->ParentID == 0) {
 				$this->owner->Depth = 1;
-				//error_log('++++ FIXING LINEAGE T2 ++++');
+				error_log('++++ FIXING LINEAGE T2 ++++');
 
 				$this->owner->Lineage = $this->paddedNumber($this->owner->ID);
 			} else {
-				//error_log('++++ FIXING LINEAGE T3 ++++');
+				error_log('++++ FIXING LINEAGE T3 ++++');
 
 				$pc = $this->owner->Parent();
-				//error_log('++++ Parent->ID = '.$pc->ID);
-				//error_log('++++ PARENT ID '.$this->owner->ParentID);
+				error_log('++++ Parent->ID = '.$pc->ID);
+				error_log('++++ PARENT ID '.$this->owner->ParentID);
 				$this->Depth = $pc->owner->Depth + 1;
 				$this->owner->Lineage = ($pc->Lineage).$this->paddedNumber($this->owner->ID);
-				//error_log('++++ LINEAGE SET TO '.$this->owner->Lineage);
+				error_log('++++ LINEAGE SET TO '.$this->owner->Lineage);
 			}
 			$this->owner->LineageFixed = true;
 			$this->owner->IsLineageDirty = false;
-			//error_log('>>>> ABOUT TO WRITE TO DB');
+			error_log('>>>> ABOUT TO WRITE TO DB');
 			$result = $this->owner->write();
-			//error_log('>>>> OBJECT WRITTEN TO DB? '.$result);
+			error_log('>>>> OBJECT WRITTEN TO DB? '.$result);
 		}
 
 		if ($this->owner->OldLineage) {
@@ -95,10 +94,10 @@ class ActsAsTreeExtension extends DataExtension {
 		//error_log("Padding ".$i." => ".$result);
 		return $result;
 	}
-	
+
 
 	/**
-	 * Migrates the old {@link PageComment} objects to {@link Comment}
+
 	 */
 	public function requireDefaultRecords() {
 		parent::requireDefaultRecords();
@@ -110,40 +109,57 @@ class ActsAsTreeExtension extends DataExtension {
 		$maxthreaddepth = 5; //SiteTree::get_config_value('ActsAsTree', 'maximum_thread_comment_depth');
 
 		$clazzname = $this->owner->ClassName;
-
-		
 		$suffixes = array('','_Live');
+
+
 		for ($i=0; $i <= $maxthreaddepth; $i++) {
 			foreach ($suffixes as $suffix) {
-				$sql = "UPDATE SiteTree{$suffix} c1\n".
-				"INNER JOIN SiteTree{$suffix} c2\n".
-				"ON c1.ID = c2.ParentID\n".
-				"SET c2.Depth=".($i+1)." WHERE c1.Depth=".$i." AND c2.ClassName='".$clazzname."';";
-				DB::query($sql);
-				//error_log($sql);
+				$sql = "SELECT ID FROM "
+                     . "SiteTree{$suffix} WHERE Depth=" . $i;
+                $records = DB::query($sql);
+                $ids = array();
+                foreach ($records as $record) {
+                    array_push($ids, $record['ID']);
+                }
+
+                if (sizeof($ids) > 0) {
+                    $csvIDs = Convert::raw2sql(implode(',', $ids));
+                    $sql = 'UPDATE SiteTree'.$suffix
+                    . " SET Depth=" . ($i+1) . ", IsLineageDirty=1 WHERE ParentID IN ($csvIDs)"
+                    . " AND DEPTH != " . ($i+1);
+                    DB::query($sql);
+                    error_log($sql);
+                }
 			}
-			
+
 		}
 
 		$ctr = 0;
 
 		for ($i=0; $i <= $maxthreaddepth; $i++) {
-			$pages =  SiteTree::get()->filter('Depth',$i)->where("Lineage IS NULL AND ClassName = '".$clazzname."'");
+            error_log('Checking lineages for ' .$i);
+            $pages =  SiteTree::get()->filter('Depth',$i);
+            foreach ($pages as $page) {
+                error_log($page->Lineage);
+            }
+
+			$pages =  SiteTree::get()->filter('Depth',$i)->where("Lineage IS NULL");
 
 			foreach ($pages as $page) {
+                error_log('FIXING LINEAGE');
 				// write the page, this will update the lineage
 				$page->write();
 
 				// check for a live version and publish the draft version if a live page exists
-				$livepage = Versioned::get_by_stage('SiteTree', 'Live')->byID($page->ID);
-				if ($livepage) {
+				//$livepage = Versioned::get_by_stage('SiteTree', 'Live')->byID($page->ID);
+				//if ($livepage) {
 					// seems like only option to get lineage into the _Live table
-					$page->publish('Stage', 'Live');
-				}
+			//		$page->publish('Stage', 'Live');
+				//}
 				$ctr++;
 			}
 		}
-		
+
 		if ($ctr > 0) {
 			DB::alteration_message("Lineage fixed for ".$ctr." pages of class ".$clazzname,"changed");
 		}
