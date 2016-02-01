@@ -72,14 +72,23 @@ class ActsAsTreeExtension extends DataExtension {
 
             if ($this->OldLineage != $this->owner->Lineage) {
                 error_log("\t++++++ Lineage changed, NEW RECORD=" . $this->ActsAsTreeNewRecord);
-                if (!$this->ActsAsTreeNewRecord) {
+                if (!$this->ActsAsTreeNewRecord && strlen($this->OldLineage) > 0) {
                     error_log("\t\tUPDATE SUBTREE REQUIRED");
                     error_log('OLD LINEAGE:' .$this->OldLineage);
                     $this->updateSubtree($this->OldLineage);
                 }
             }
             $this->owner->LineageState = 'Updated';
-            $this->owner->write();
+
+            // Use SQL to update to avoid rounds of onBefore and onAfter write
+            //$this->owner->write();
+            $suffix = $this->getVersionSuffix();
+            $lineage = $this->owner->Lineage;
+            $sql = 'UPDATE "SiteTree'.$suffix.'" SET "Lineage" = \''.$lineage.'\'';
+            $sql .= ', "LineageState"=\'Updated\'';
+            $sql .= ' WHERE "ID"=' . $this->owner->ID . ';';
+            error_log('SQL:' . $sql);
+            DB::query($sql);
         }
 
     }
@@ -95,15 +104,16 @@ class ActsAsTreeExtension extends DataExtension {
         $pages = SiteTree::get()
                 ->where('"Lineage" LIKE \'' . $lineageToUpdate .'%\'')
                 ->sort('Depth');
+        error_log('OLD LIN:' . $this->OldLineage);
         error_log('FOUND PAGES TO UPDATE:' , $pages->count());
         $suffix = $this->getVersionSuffix();
         DB::query('begin');
         foreach ($pages as $page) {
             $sql = '';
 
-            error_log('UPDATE REQUIRED: ' .$page->Lineage);
+            error_log('UPDATE REQUIRED, CURRENT LIN: ' .$page->Lineage);
             if ($page->Lineage == $lineageToUpdate) {
-                error_log('Skiing page ' . $page->Lineage);
+                error_log('Skipping page ' . $page->Lineage);
             } else {
                 $lineage = substr($page->Lineage, $lenToRemove);
                 $lineage = $this->owner->Lineage . $lineage;
@@ -165,7 +175,7 @@ class ActsAsTreeExtension extends DataExtension {
 
 		$ctr = 0;
 
-        $i = 1;
+        for ($i=0; $i <= $maxthreaddepth; $i++) {
             $pages =  SiteTree::get()->filter('Depth',$i);
 			$pages =  SiteTree::get()->filter('Depth',$i)->where('"Lineage" IS NULL');
 
@@ -182,7 +192,7 @@ class ActsAsTreeExtension extends DataExtension {
 				$ctr++;
 			}
 
-
+        }
 		if ($ctr > 0) {
 			DB::alteration_message("Lineage fixed for ".$ctr." pages of class ".$clazzname,"changed");
 		}
