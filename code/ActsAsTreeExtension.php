@@ -91,7 +91,7 @@ class ActsAsTreeExtension extends DataExtension {
         $lenToRemove = strlen($lineageToUpdate);
         // FIXME, sql injection
         $pages = SiteTree::get()
-                ->where('Lineage LIKE \'' . $lineageToUpdate .'%\'')
+                ->where('"Lineage" LIKE \'' . $lineageToUpdate .'%\'')
                 ->sort('Depth');
         error_log('FOUND PAGES TO UPDATE:' , $pages->count());
         $suffix = $this->getVersionSuffix();
@@ -108,8 +108,8 @@ class ActsAsTreeExtension extends DataExtension {
                 error_log('MOVED LINEAGE: ' . $lineage);
                 $page->Lineage = $lineage;
 
-                $sql .= 'UPDATE "SiteTree'.$suffix.'" SET Lineage = \''.$lineage.'\'';
-                $sql .= ' WHERE ID=' . $page->ID . ';';
+                $sql .= 'UPDATE "SiteTree'.$suffix.'" SET "Lineage" = \''.$lineage.'\'';
+                $sql .= ' WHERE "ID"=' . $page->ID . ';';
                 $sql .' "\n';
                 error_log('SQL:' . $sql);
                 DB::query($sql);
@@ -141,7 +141,7 @@ class ActsAsTreeExtension extends DataExtension {
 
 		for ($i=0; $i <= $maxthreaddepth; $i++) {
 			foreach ($suffixes as $suffix) {
-				$sql = 'SELECT ID FROM '
+				$sql = 'SELECT "ID" FROM '
                      . "\"SiteTree{$suffix}\" WHERE \"Depth\"=" . $i;
                 $records = DB::query($sql);
                 $ids = array();
@@ -164,7 +164,7 @@ class ActsAsTreeExtension extends DataExtension {
 
 		for ($i=0; $i <= $maxthreaddepth; $i++) {
             $pages =  SiteTree::get()->filter('Depth',$i);
-			$pages =  SiteTree::get()->filter('Depth',$i)->where("Lineage IS NULL");
+			$pages =  SiteTree::get()->filter('Depth',$i)->where('"Lineage" IS NULL');
 
 			foreach ($pages as $page) {
 				// write the page, this will update the lineage
