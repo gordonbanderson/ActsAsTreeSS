@@ -130,6 +130,7 @@ class ActsAsTreeExtension extends DataExtension {
 		parent::requireDefaultRecords();
 
 		// FIXME - take account of locales
+        // Take account of doPublish with no parent
 		DB::query('UPDATE "SiteTree" set "Depth"=1 where "ParentID" = 0;');
 
 		// add depth to comments missing this value
@@ -162,7 +163,7 @@ class ActsAsTreeExtension extends DataExtension {
 
 		$ctr = 0;
 
-		for ($i=0; $i <= $maxthreaddepth; $i++) {
+        $i = 1;
             $pages =  SiteTree::get()->filter('Depth',$i);
 			$pages =  SiteTree::get()->filter('Depth',$i)->where("Lineage IS NULL");
 
@@ -178,7 +179,7 @@ class ActsAsTreeExtension extends DataExtension {
 				//}
 				$ctr++;
 			}
-		}
+
 
 		if ($ctr > 0) {
 			DB::alteration_message("Lineage fixed for ".$ctr." pages of class ".$clazzname,"changed");
