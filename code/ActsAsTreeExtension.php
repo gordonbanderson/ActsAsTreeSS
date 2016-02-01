@@ -59,12 +59,14 @@ class ActsAsTreeExtension extends DataExtension {
         ) {
             if ($this->owner->ParentID == 0) {
                 $this->owner->Depth = 1;
-                $this->owner->Lineage = $this->paddedNumber($this->owner->ID);
+                $this->owner->Lineage = '|' . $this->paddedNumber($this->owner->ID);
             } else {
                 $parent = $this->owner->Parent();
                 $this->owner->Depth = $parent->Depth + 1;
                 error_log('Stetching lineage');
-                $this->owner->Lineage = $parent->Lineage . $this->paddedNumber($this->owner->ID);
+                $paddedParent = '|' . $this->paddedNumber($this->owner->ParentID);
+                $paddedParentAndChild = $paddedParent . $this->paddedNumber($this->owner->ID);
+                $this->owner->Lineage = str_replace($paddedParent, $paddedParentAndChild, $parent->Lineage);
                 error_log('Streteched to ' . $this->owner->Lineage);
             }
 
@@ -122,7 +124,7 @@ class ActsAsTreeExtension extends DataExtension {
 
 	private function paddedNumber($i) {
 		// fixme, use config
-		$result = str_pad($i, 5, '0', STR_PAD_LEFT);
+        $result = "{$i}|";
 		return $result;
 	}
 
