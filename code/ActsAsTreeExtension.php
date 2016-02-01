@@ -20,12 +20,19 @@ class ActsAsTreeExtension extends DataExtension {
 
     private $oawCtr = 0;
 
+    private $ActsAsTreeNewRecord = false;
+
+    public function onBeforePublish() {
+        //$this->owner->Depth = 0;
+        //$this->owner->Lineage =null;
+        //$this->owner->LineageState = 'Updating';
+        error_log('OBP');
+    }
+
     public function onBeforeWrite() {
         if (!$this->owner->ID) {
             error_log('++++ NEW REOCRD ++++');
             $this->ActsAsTreeNewRecord = true;
-        } else {
-            $this->ActsAsTreeNewRecord = false;
         }
 
         parent::onBeforeWrite();
@@ -46,7 +53,7 @@ class ActsAsTreeExtension extends DataExtension {
         error_log('NEW RECORD? ' . $this->ActsAsTreeNewRecord);
 
 
-
+        $this->OldLineage = $this->owner->Lineage;
         if ($this->owner->LineageState != 'Updated' || $this->oawCtr == 3 ||
             (!$this->ActsAsTreeNewRecord && $this->oawCtr == 1)
         ) {
@@ -60,6 +67,15 @@ class ActsAsTreeExtension extends DataExtension {
                 $this->owner->Lineage = $parent->Lineage . $this->paddedNumber($this->owner->ID);
                 error_log('Streteched to ' . $this->owner->Lineage);
             }
+
+            if ($this->OldLineage != $this->owner->Lineage) {
+                error_log("\t++++++ Lineage changed, NEW RECORD=" . $this->ActsAsTreeNewRecord);
+                if (!$this->ActsAsTreeNewRecord) {
+                    error_log("\t\tUPDATE SUBTREE REQUIRED");
+                    error_log('OLD LINEAGE:' .$this->OldLineage);
+                    $this->updateSubtree($this->OldLineage);
+                }
+            }
             $this->owner->LineageState = 'Updated';
             $this->owner->write();
         }
@@ -69,14 +85,38 @@ class ActsAsTreeExtension extends DataExtension {
     /*
     Search for pages matching a given lineage and update them to the current one
     @param $lineageToUpdate The lineage to update, usually the old lineage after
-            a page has been moved
+                            a page has been moved
      */
     private function updateSubtree($lineageToUpdate) {
+        $lenToRemove = strlen($lineageToUpdate);
         // FIXME, sql injection
-        $pages = SiteTree::get()->where('Lineage LIKE \'' . $lineageToUpdate .'%\'')->sort('Depth');
+        $pages = SiteTree::get()
+                ->where('Lineage LIKE \'' . $lineageToUpdate .'%\'')
+                ->sort('Depth');
+        error_log('FOUND PAGES TO UPDATE:' , $pages->count());
+        $suffix = $this->getVersionSuffix();
+        DB::query('begin');
         foreach ($pages as $page) {
+            $sql = '';
+
             error_log('UPDATE REQUIRED: ' .$page->Lineage);
+            if ($page->Lineage == $lineageToUpdate) {
+                error_log('Skiing page ' . $page->Lineage);
+            } else {
+                $lineage = substr($page->Lineage, $lenToRemove);
+                $lineage = $this->owner->Lineage . $lineage;
+                error_log('MOVED LINEAGE: ' . $lineage);
+                $page->Lineage = $lineage;
+
+                $sql .= 'UPDATE "SiteTree'.$suffix.'" SET Lineage = \''.$lineage.'\'';
+                $sql .= ' WHERE ID=' . $page->ID . ';';
+                $sql .' "\n';
+                error_log('SQL:' . $sql);
+                DB::query($sql);
+            }
         }
+
+        DB::query('commit');
     }
 
 
@@ -90,7 +130,7 @@ class ActsAsTreeExtension extends DataExtension {
 		parent::requireDefaultRecords();
 
 		// FIXME - take account of locales
-		DB::query('UPDATE SiteTree set Depth=1 where ParentID = 0;');
+		DB::query('UPDATE "SiteTree" set "Depth"=1 where "ParentID" = 0;');
 
 		// add depth to comments missing this value
 		$maxthreaddepth = 5; //SiteTree::get_config_value('ActsAsTree', 'maximum_thread_comment_depth');
@@ -101,8 +141,8 @@ class ActsAsTreeExtension extends DataExtension {
 
 		for ($i=0; $i <= $maxthreaddepth; $i++) {
 			foreach ($suffixes as $suffix) {
-				$sql = "SELECT ID FROM "
-                     . "SiteTree{$suffix} WHERE Depth=" . $i;
+				$sql = 'SELECT ID FROM '
+                     . "\"SiteTree{$suffix}\" WHERE \"Depth\"=" . $i;
                 $records = DB::query($sql);
                 $ids = array();
                 foreach ($records as $record) {
@@ -111,9 +151,9 @@ class ActsAsTreeExtension extends DataExtension {
 
                 if (sizeof($ids) > 0) {
                     $csvIDs = Convert::raw2sql(implode(',', $ids));
-                    $sql = 'UPDATE SiteTree'.$suffix
-                    . " SET Depth=" . ($i+1) . ", LineageState='Updating' WHERE ParentID IN ($csvIDs)"
-                    . " AND DEPTH != " . ($i+1);
+                    $sql = 'UPDATE "SiteTree'.$suffix
+                    . "\" SET \"Depth\"=" . ($i+1) . ", \"LineageState\"='Updating' WHERE \"ParentID\" IN ($csvIDs)"
+                    . " AND \"Depth\" != " . ($i+1);
                     DB::query($sql);
                 }
 			}
@@ -147,5 +187,13 @@ class ActsAsTreeExtension extends DataExtension {
 		// FIXME Live without draft need tweaked also
 	}
 
+    private function getVersionSuffix() {
+        $suffix = '';
+        $mode = Versioned::get_reading_mode();
+        if($mode == 'Stage.Live') {
+                $suffix = '_Live';
+        }
+        return $suffix;
+    }
 
 }
