@@ -18,118 +18,24 @@ class ActsAsTreeExtension extends DataExtension {
 
     private $completedWrite = false;
 
-	//private $oawctr = 0;
-/*
-------- on before write cow = --------
-OBW 10:A different title
-LS:Updating
-OBW: CHANGED:1
-------- on after write --------
-OAW 10, LS=Updating
-OAW: LINEAGE SET TO UPDATED
-OAW: WRITING 10
-------- on before write cow = 1--------
-OBW 10:A different title
-LS:Updated
-OBW: CHANGED:1
-------- on after write --------
-OAW 10, LS=Updated
-A different title ID=10, D=3, L=0000900010
-F
-
-
- */
-	public function onBeforeWriteNOT() {
-        error_log('------- on before write cow = ' . $this->completedWrite . '--------');
-        error_log(print_r($this,1));
-        error_log('OBW ' .$this->owner->ID . ':' . $this->owner->Title);
-        error_log('LS:' . $this->owner->LineageState);
-        //error_log(print_r($this->owner->record,1));
-        error_log('OBW: CHANGED:' . $this->owner->isChanged());
-        error_log('RECORD:');
-        error_log($this->owner->record['ParentIDdfd']);
-
-       // if ($this->owner->isChanged('ParentID') && !$this->completedWrite) {
-        if (!$this->completedWrite) {
-            error_log('OBW: **** MOVE ****');
-			$this->owner->SubTreeRequiresUpdate = true;
-			$this->owner->OldLineage = $this->owner->Lineage;
-			$this->owner->LineageState = 'Updating';
-            error_log('OBW: LINEAGE SET TO UPDATING');
-		}
-
-                    error_log('OBW: Depth = ' . $this->owner->Depth);
-
-
-		parent::onBeforeWrite();
-	}
-
-
-	public function onAfterWriteNOT() {
-        error_log('------- on after write --------');
-        error_log('OAW ' .$this->owner->ID . ', LS=' . $this->owner->LineageState);
-		//$this->oawctr++;
-
-		if (!$this->completedWrite && $this->owner->LineageState != 'Updated') {
-            error_log('CHECKING PARENT ID ' . $this->owner->ParentID);
-			if ($this->owner->ParentID == 0) {
-                error_log('OAW: DEPTH T1');
-				$this->owner->Depth = 1;
-
-				$this->owner->Lineage = $this->paddedNumber($this->owner->ID);
-			} else {
-                error_log('OAW: DEPTH T2');
-				$pc = $this->owner->Parent();
-                error_log('OAW: PARENT LINEAGE: ' . $pc->Lineage);
-                error_log('OAW: PARENT DEPTH: ' . $pc->Depth);
-				$this->owner->Depth = $pc->Depth + 1;
-				$this->owner->Lineage = ($pc->Lineage).$this->paddedNumber($this->owner->ID);
-                error_log('**** OAW: SET TO, THIS LINEAGE: ' . $this->owner->Lineage);
-                asdfsdf;
-			}
-            $this->owner->LineageState = 'Updated';
-            $this->completedWrite = true;
-            error_log('OAW: LINEAGE STATE SET TO UPDATED');
-            error_log('OAW: LINEAGE SET TO ' . $this->owner->Lineage);
-            error_log('OAW: WRITING ' . $this->owner->ID);
-            error_log('OAW: Depth = ' . $this->owner->Depth);
-			$result = $this->owner->write();
-		} else {
-            error_log('>>>> NOT WRITING DEPTH <<<<');
-            error_log('OAW: LINEAGE IS ' . $this->owner->Lineage);
-            error_log('OAW: LS ' . $this->owner->LineageState);
-            error_log('OAW: ID ' . $this->owner->ID);
-            error_log('OAW: Depth = ' . $this->owner->Depth);
-            error_log('>>>> /NOT WRITING DEPTH <<<<');
-        }
-
-		parent::onAfterWrite();
-
-        if (!empty($this->owner->OldLineage)) {
-            error_log('%%%%% OLD LINEAGE FOUND, SUBTREE NEEDS TWEAKED ');
-            $this->updateSubtree($this->owner->OldLineage);
-            //error_log(print_r($this,1));
-        }
-
-		/*
-		subtree require fixing?
-		if so
-			- find the old lineage
-			- find the old depth
-			- find all the old items for the current stage starting with the old lineage
-				- i) add delta to the depth
-				- ii) Update lineage by search and replace
-			- empty old lineage, old depth fields
-		 */
-	}
-
-
     private $oawCtr = 0;
+
+    public function onBeforeWrite() {
+        if (!$this->owner->ID) {
+            error_log('++++ NEW REOCRD ++++');
+            $this->ActsAsTreeNewRecord = true;
+        } else {
+            $this->ActsAsTreeNewRecord = false;
+        }
+
+        parent::onBeforeWrite();
+    }
 
     /*
     Calculate Lineage after write, as ID is required first
      */
     public function onAfterWrite() {
+        parent::onAfterWrite();
         $this->oawCtr++;
         error_log("\n\n\n\n" . 'ON AFTER CTR: ' . $this->oawCtr);
         error_log('ON AFTER WRITE: ' . $this->owner->ID);
@@ -137,9 +43,13 @@ F
         error_log('ON AFTER WRITE LineageState=: ' . $this->owner->LineageState);
 
         error_log('PARENT CHANGED? ' . $this->owner->isChanged('ParentID'));
+        error_log('NEW RECORD? ' . $this->ActsAsTreeNewRecord);
 
 
-        if ($this->owner->LineageState != 'Updated' || $this->oawCtr == 3) {
+
+        if ($this->owner->LineageState != 'Updated' || $this->oawCtr == 3 ||
+            (!$this->ActsAsTreeNewRecord && $this->oawCtr == 1)
+        ) {
             if ($this->owner->ParentID == 0) {
                 $this->owner->Depth = 1;
                 $this->owner->Lineage = $this->paddedNumber($this->owner->ID);
@@ -148,6 +58,7 @@ F
                 $this->owner->Depth = $parent->Depth + 1;
                 error_log('Stetching lineage');
                 $this->owner->Lineage = $parent->Lineage . $this->paddedNumber($this->owner->ID);
+                error_log('Streteched to ' . $this->owner->Lineage);
             }
             $this->owner->LineageState = 'Updated';
             $this->owner->write();
