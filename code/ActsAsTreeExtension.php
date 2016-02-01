@@ -43,6 +43,8 @@ class ActsAsTreeExtension extends DataExtension {
      */
     public function onAfterWrite() {
         parent::onAfterWrite();
+
+        error_log('OAW: VMODE=' . Versioned::get_reading_mode());
         $this->oawCtr++;
         error_log("\n\n\n\n" . 'ON AFTER CTR: ' . $this->oawCtr);
         error_log('ON AFTER WRITE: ' . $this->owner->ID);
@@ -131,7 +133,6 @@ class ActsAsTreeExtension extends DataExtension {
         DB::query('commit');
     }
 
-
 	private function paddedNumber($i) {
 		// fixme, use config
         $result = "{$i}|";
@@ -170,29 +171,35 @@ class ActsAsTreeExtension extends DataExtension {
                     DB::query($sql);
                 }
 			}
-
 		}
 
 		$ctr = 0;
-
+        $origMode = Versioned::get_reading_mode();
+        error_log('VerSIONED MODE:' . $origMode);
         for ($i=0; $i <= $maxthreaddepth; $i++) {
-            $pages =  SiteTree::get()->filter('Depth',$i);
-			$pages =  SiteTree::get()->filter('Depth',$i)->where('"Lineage" IS NULL');
+            foreach ($suffixes as $suffix) {
+                if ($suffix == '') {
+                    Versioned::set_reading_mode('Stage.Stage');
+                } else {
+                    Versioned::set_reading_mode('Stage.Live');
+                }
+    			$pages =  SiteTree::get()->filter('Depth',$i)->where('"Lineage" IS NULL');
 
-			foreach ($pages as $page) {
-				// write the page, this will update the lineage
-				$page->write();
+    			foreach ($pages as $page) {
+    				// write the page, this will update the lineage
+    				$page->write();
 
-				// check for a live version and publish the draft version if a live page exists
-				//$livepage = Versioned::get_by_stage('SiteTree', 'Live')->byID($page->ID);
-				//if ($livepage) {
-					// seems like only option to get lineage into the _Live table
-			//		$page->publish('Stage', 'Live');
-				//}
-				$ctr++;
-			}
-
+    				// check for a live version and publish the draft version if a live page exists
+    				//$livepage = Versioned::get_by_stage('SiteTree', 'Live')->byID($page->ID);
+    				//if ($livepage) {
+    					// seems like only option to get lineage into the _Live table
+    			//		$page->publish('Stage', 'Live');
+    				//}
+    				$ctr++;
+    			}
+            }
         }
+        Versioned::set_reading_mode($origMode); // reset current mode
 		if ($ctr > 0) {
 			DB::alteration_message("Lineage fixed for ".$ctr." pages of class ".$clazzname,"changed");
 		}
